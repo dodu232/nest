@@ -5,6 +5,7 @@ import { Injectable } from '@nestjs/common';
 import { CreateBoardDto } from './dto/create-board.dto';
 import { BoardStatus } from './board-status.enum';
 import { threadId } from 'worker_threads';
+import { User } from 'src/auth/user.entity';
 
 @Injectable()
 export class BoardRepository {
@@ -13,13 +14,14 @@ export class BoardRepository {
     private readonly boardRepository: Repository<Board>,
   ) {}
 
-  async create(dto: CreateBoardDto): Promise<Board>{
+  async create(dto: CreateBoardDto, user: User): Promise<Board>{
     const {title, description} = dto;
 
     const board = this.boardRepository.create({
         title,
         description,
-        status: BoardStatus.PUBLIC
+        status: BoardStatus.PUBLIC,
+        user
     });
 
     return await this.boardRepository.save(board);
@@ -29,8 +31,12 @@ export class BoardRepository {
     return this.boardRepository.findOneBy({id});
   }
 
-  async findAll(): Promise<Board[]>{
-    return this.boardRepository.find();
+  async findAll(user: User): Promise<Board[]>{
+    const query = this.boardRepository.createQueryBuilder('board');
+
+    query.where('board.userId = :userId', {userId: user.id});
+
+    return await query.getMany();
   }
 
   async update(id: number, dto: CreateBoardDto): Promise<Board>{
@@ -55,7 +61,7 @@ export class BoardRepository {
     return board;
   }
 
-  async delete(id: number): Promise<DeleteResult>{
-    return this.boardRepository.delete(id);
+  async delete(id: number, user: User): Promise<DeleteResult>{
+    return this.boardRepository.delete({id, user});
   }
 }
